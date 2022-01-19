@@ -1,0 +1,405 @@
+
+
+function dropdown_handler() {
+  $('#account_dropdown_link').click( function() {
+    var toppos = $('#account_dropdown_link').position().top;
+    var leftpos = $('#account_dropdown_link').position().left;
+    $(".dropdown-account").css({'left': leftpos, 'top': toppos + 25})
+  });
+}
+
+function csrfSafeMethod(method) {
+    // these HTTP methods do not require CSRF protection
+    return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+}
+// using jQuery
+function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie != '') {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = jQuery.trim(cookies[i]);
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) == (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function prepare_csrf() {
+  var csrftoken = getCookie('csrftoken');
+  $.ajaxSetup({
+    crossDomain: false, // obviates need for sameOrigin test
+    beforeSend: function(xhr, settings) {
+        if (!csrfSafeMethod(settings.type)) {
+            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+        }
+    }
+  });
+}
+
+jQuery.support.placeholder = (function(){
+    var i = document.createElement('input');
+    return 'placeholder' in i;
+})();
+
+// Released under MIT license: http://www.opensource.org/licenses/mit-license.php
+if ($.support.placeholder != true) {
+  $('[placeholder]').focus(function() {
+    var input = $(this);
+    if (input.val() == input.attr('placeholder')) {
+      input.val('');
+      input.removeClass('placeholder');
+    }
+  }).blur(function() {
+    var input = $(this);
+    if (input.val() == '' || input.val() == input.attr('placeholder')) {
+      input.addClass('placeholder');
+      input.val(input.attr('placeholder'));
+    }
+  }).blur().parents('form').submit(function() {
+    $(this).find('[placeholder]').each(function() {
+      var input = $(this);
+      if (input.val() == input.attr('placeholder')) {
+        input.val('');
+      }
+    })
+  });
+}
+
+function change_tour_text_if_necessary_for_username() {
+  if ($('#tutorialDiv').length) {
+    var teacher_username = $('#teacher_username_passed_in').val();
+    var entered_teacher_username = $('#id_teacher_username').val();
+
+    if (teacher_username == entered_teacher_username) {
+      var click_login_text = '3. Click Log In.'
+    }
+    $('#tutorialDiv').html(click_login_text);
+  }
+}
+
+function select_demo_student_if_necessary() {
+  if ($('#tutorialDiv').length) {
+    $('select>option').each(function() {
+      if ($(this).html() == 'Demo Student') {
+        $(this).prop('selected', true);
+      }
+    });
+  }
+}
+
+function populate_all_students() {
+  var json_students = $('#json_students').val();
+  var students = $.parseJSON(json_students);
+  $('#id_student').html('');
+  var newhtml = '';
+  for (var j = 0; j < students.length; j++) {
+    var curhtml = $('#id_student').html();
+    if (j == 0) {
+      var default_row = '<option class="student_list_item" value="-1">Choose Name</option>';
+      var newhtml = curhtml + default_row + '<option class="student_list_item" value="' + students[j].id + '">' + students[j].first_name + ' ' + students[j].last_name +'</option>';
+    }
+    else {
+      var newhtml = curhtml + '<option class="student_list_item" value="' + students[j].id + '">' + students[j].first_name + ' ' + students[j].last_name +'</option>';
+    }
+
+    $('#id_student').html(newhtml);
+  }
+}
+
+function send_username() {
+        //alert('sending username');
+      var entered_username = $('#id_teacher_username').val();
+
+      if (entered_username != '') {
+        $.ajax({
+          type: 'GET',
+          url: '/student-dropdown',
+          data: { username: entered_username },
+          success: function(data) {
+            if (data == 'no_students') {
+                  //alert('There are no students in your class. Tell your teacher to create some students and then try again.');
+                  $('#id_student').html('<option class="student_list_item" value="-1">No Students in Class</option>');
+            }
+            else {
+
+            if (data != 'nothing') {
+
+              //in here see if they're putting in the correct username and if so,
+              //change the instructions text at the top to be "3. click Log In..."
+              var curjsonstudents = $('#json_students').val();
+              $('#json_students').val(data);
+
+
+              // the problem is that there's this syntax error.
+              if (data != 'password') {
+                $('#id_student').show();
+
+
+                  var students = $.parseJSON(data);
+
+                  if (curjsonstudents != data) {
+                    populate_all_students();
+
+                  }
+
+              }
+              else {
+                $('#id_student').hide();
+              }
+
+
+              change_tour_text_if_necessary_for_username();
+
+              if (data == 'password') {
+                $('#id_username_password_login').val('true');
+                $('.student_password').show();
+              }
+              else {
+                $('#id_username_password_login').val('false');
+                $('.student_password').hide();
+
+                select_demo_student_if_necessary();
+
+              }
+
+            }
+            }
+          },
+          error: function(data) {
+            send_username();
+          }
+        });
+      }
+      else {
+        $('.student_password').hide();
+        $('#id_student').show();
+      }
+}
+
+function login_prep() {
+    $.ajaxSetup({ cache: false });
+    $('#student_button').click( function() {
+      $('#teacher_or_student').hide();
+      $('#teacher_login_form').hide();
+      $('#student_login_form').show();
+      if ($('#tutorialDiv').length) {
+        var teacher_username = $('#teacher_username_passed_in').val();
+        var enter_username_text = '2. Enter <u>' + teacher_username + '</u> in the teacher email box.'
+        $('#tutorialDiv').html(enter_username_text);
+      }
+    });
+
+    $('#teacher_button').click( function() {
+      $('#teacher_or_student').hide();
+      $('#student_login_form').hide();
+      $('#teacher_login_form').show();
+    });
+
+
+    $('#teacher_link').click( function(event) {
+      event.preventDefault();
+      $('#teacher_button').trigger('click');
+    });
+
+    $('#student_link').click( function(event) {
+      event.preventDefault();
+      $('#student_button').trigger('click');
+    });
+
+    $('#id_teacher_username').bind('keyup', function( event ) {
+      send_username();
+      setTimeout(send_username, 2000);
+    });
+    default_login = $('#default_login_type').val();
+    if (default_login == 'teacher') {
+      $('#teacher_button').trigger('click');
+    }
+    if (default_login == 'student') {
+      $('#student_button').trigger('click');
+    }
+}
+
+function student_login_click_handler() {
+  if ($('#id_username_password_login').val() == 'true') {
+    $('#login_form_student').submit();
+  }
+  else {
+    if (($('#id_student').val() == 'defaultstudent') || ($('#id_student').val() == '') || ($('#id_student').val() == null)) {
+      // If for some reason the student list hasn't popped up yet, don't submit the form--instead just refill the dropdown
+      send_username();
+      setTimeout(send_username, 2000);
+    }
+    else {
+      if ($('#id_student').val() != -1) {
+        $('#login_form_student').submit();
+      }
+    }
+  }
+}
+
+function invites_prep() {
+
+    $('#invite_friends').click( function(e) {
+          e.preventDefault();
+          $('body').addClass('stop-scrolling');
+      $('#inviteModal').modal('show');
+    });
+
+    $('#close_invite_button').click( function() {
+          $('body').removeClass('stop-scrolling');
+          $('#inviteModal').modal('hide');
+          invitelist = $('#invitelist').val();
+          var inviter_id = $('#user_id').val();
+          $.ajax({
+            type: 'POST',
+            url: '/invite',
+            data: { emails: invitelist, inviter_id: inviter_id },
+            success: function(data) {
+              alert('The invitations have been sent!');
+            }
+          });
+    });
+
+    $('#cancel_invite_button').click( function() {
+          $('body').removeClass('stop-scrolling');
+      $('#inviteModal').modal('hide');
+    });
+
+}
+
+function old_browser(newhtml) {
+  $('body').html(newhtml);
+}
+
+function old_browser_hint(name, version, latest_version_link) {
+
+  var alert_text = 'You appear to be using ' + name + ' ' + version + ', which is an old version that we don\'t support. We recommend upgrading to the <a target="_blank" href="' + latest_version_link + '">latest version</a> of ' + name + '.';
+
+  $('#warning_text').html(alert_text);
+  $('#browserModal').modal('show');
+  $('#teacher_or_student').hide();
+}
+
+
+function teacher_listeners() {
+
+$('#close_tour_button').click( function() {
+    $('#tourModal').modal('hide');
+
+  });
+
+  $('#help_link').click( function(e) {
+      e.preventDefault();
+      $('#tourModal').modal('show');
+
+
+
+    });
+
+  $('#class_settings_link').click( function() {
+
+    $('#settingsModal').modal('show');
+  });
+
+  $('#limit_recordings_description').click( function(e) {
+    $('#limit_recordings_to_one_minute').trigger('click');
+  });
+
+  $('#show_pictures_description').click( function(e) {
+    $('#show_pictures').trigger('click');
+  });
+
+
+  $('#cancel_settings_button').click( function() {
+    $('#settingsModal').modal('hide');
+    $('body').removeClass('stop-scrolling');
+
+
+
+
+    // make sure to reset the "initials" after we've changed the settings.
+    if ($('#initial_cut_off_recording').val() == 'True') {
+      $('#limit_recordings_to_one_minute').prop('checked', true);
+    }
+    else {
+      $('#limit_recordings_to_one_minute').prop('checked', false);
+    }
+
+    if ($('#initial_show_pictures').val() == 'True') {
+      $('#show_pictures').prop('checked', true);
+    }
+    else {
+      $('#show_pictures').prop('checked', false);
+    }
+
+  });
+  $('#close_settings_button').click( function() {
+    $('#settingsModal').modal('hide');
+    $('body').removeClass('stop-scrolling');
+
+    if ($('#limit_recordings_to_one_minute').is(':checked')) {
+      var cut_off_recording = 'True';
+    }
+    else {
+      var cut_off_recording = 'False';
+    }
+    if ($('#show_pictures').is(':checked')) {
+      var show_pictures = 'True';
+    }
+    else {
+      var show_pictures = 'False';
+    }
+
+    $('#initial_cut_off_recording').val(cut_off_recording);
+    $('#initial_show_pictures').val(show_pictures);
+
+    if ($('.classlist_row, .classlist_row_last').length) {
+      change_readings = false;
+    }
+    else {
+      // only change readings on the server if we don't have dropdowns to change the readings from.
+      change_readings = true;
+    }
+
+
+    this_user_id = $('#user_id').val();
+
+
+      $.ajax({
+        type: 'POST',
+        url: '/save-class-settings',
+        data: { user_id: this_user_id, cut_off_recording: cut_off_recording,
+                show_pictures: show_pictures,
+                change_readings: change_readings },
+        success: function(data) {
+        }
+      });
+
+  });
+}
+
+function teacher_tooltips() {
+  $('#comprehension_tracker_link').tooltip({title: 'Common Core Comprehension', placement: 'bottom'});
+  $('#dash_link').tooltip({title: 'Class Dashboard', placement: 'bottom'});
+  $('#help_link').tooltip({title: 'Help', placement: 'bottom'});
+  $('#conversion_chart_link').tooltip({title: 'Reading Level Conversions', placement: 'bottom'});
+  $("#class_settings_link").tooltip({title:'Class Settings', placement:'bottom'});
+}
+
+function reset_password_for_email(email) {
+  if (email) {
+    $.ajax({
+      type: 'POST',
+      url: '/reset-password/' + email,
+      success: function(data) { window.alert('Reset password email sent!');},
+      error: function(data) { window.alert(data.responseText);},
+    });
+  } else {
+    window.alert('Please provide an email address')
+  }
+}
